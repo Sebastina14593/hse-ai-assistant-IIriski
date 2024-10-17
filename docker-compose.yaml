@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  hse_hack:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/code
+    command: ["python", "main.py"]

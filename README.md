@@ -1,0 +1,1 @@
+<h1>HSE AI ASSISTANT</h1>

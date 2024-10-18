@@ -52,7 +52,7 @@ docker build . --tag hse_hack
 ```
 #### 2. Запуск контейнера Docker
 ```commandline
-docker-compose run
+docker compose up
 ```
 ### Способ 3: Запуск в Jupyter Notebook
 Если возникают проблемы с запуском Docker, можно воспользоваться Jupyter Notebook, открыв файл `main_jupyter.ipynb`

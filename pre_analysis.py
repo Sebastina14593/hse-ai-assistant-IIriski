@@ -125,14 +125,25 @@ def func_script_check(script, tests_input_list, tests_output_list):
             args = []
             kwargs = {}
 
-            # Обработка параметров функции
-            for i, (name, param) in enumerate(func_signature.parameters.items()):
-                if param.default == inspect.Parameter.empty:
-                    # Обязательный параметр
-                    args.append(tests_input_list[idx][i])  # Пример значений для тестирования
-                else:
-                    # Параметр с значением по умолчанию
-                    kwargs[name] = param.default
+            # если параметр один
+            if len(tests_input_list) == 1:
+                # Обработка параметров функции
+                for i, (name, param) in enumerate(func_signature.parameters.items()):
+                    if param.default == inspect.Parameter.empty:
+                        # Обязательный параметр
+                        args.append(tests_input_list[idx])  # Пример значений для тестирования
+                    else:
+                        # Параметр с значением по умолчанию
+                        kwargs[name] = param.default
+            else:
+                # Обработка параметров функции
+                for i, (name, param) in enumerate(func_signature.parameters.items()):
+                    if param.default == inspect.Parameter.empty:
+                        # Обязательный параметр
+                        args.append(tests_input_list[idx][i])  # Пример значений для тестирования
+                    else:
+                        # Параметр с значением по умолчанию
+                        kwargs[name] = param.default
 
             # Выполнение функции с аргументами и ключевыми аргументами
             result = function(*args, **kwargs)
@@ -141,6 +152,9 @@ def func_script_check(script, tests_input_list, tests_output_list):
             return f"В скрипте студента следующая синтаксическая ошибка: {str(e)}"
 
         if result != tests_output_list[idx]:
+            if len(tests_input_list) == 1:
+                return f'''Студент не прошел проверку теста. Он ввел input: "{tests_input_list}", ожидалось получить output: "{tests_output_list}", но студент получил output: "{result}"'''
+
             return f'''Студент не прошел проверку теста. Он ввел input: "{'; '.join(tests_input_list[idx])}", ожидалось получить output: "{'; '.join(tests_output_list[idx])}", но студент получил output: "{result}"'''
 
     return "Тесты пройдены"
@@ -169,7 +183,7 @@ def data_correction(tasks, tests, solutions):
     # Для задач 1ой группы предполагается, что если в программе задействуется сразу несколько input,
     # то они переносятся символом \n
     # Т.е. сделаем следующее
-    tasks["input"] = tasks.apply(lambda x: [el.split("\n") for el in x["input"]] if x["task_type"] == 1 else x["input"], axis = 1)
+    tasks["input"] = tasks.apply(lambda x: [el.split("\n") if "\n" in el else el.split(";") for el in x["input"]] if x["task_type"] == 1 else x["input"], axis = 1)
 
     # Если же это 3я группа задач, то предполагается, что это функции, принимающие на вход какие-либо значения (структуры)
     # Используем метод literal_eval из модуля ast для преобразования структур данных
@@ -211,7 +225,9 @@ def data_correction(tasks, tests, solutions):
 
 def data_preparation(sample_type="train"):
     # Загружаем данные
+    print("Загружаем данные")
     df_tests, df_tasks, df_solutions = data_loader(sample_type)
     # Корректируем их и добавляем дополнительные поля
+    print("Корректируем их и добавляем дополнительные поля")
     df_result = data_correction(df_tasks, df_tests, df_solutions)
     return df_result

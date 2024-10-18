@@ -1,61 +1,96 @@
-# Импортируем pandas
-import numpy as np
-from pre_analysis import data_preparation
-import datetime
+# Выгружаем итоговый датафрейм
+from errors_defining import errors_def
 
-syntax_error_template_value = """
-Ты помощник на специальной обучающей платформе, на которой студент учится программировать, отправляя на проверку свой код. Твоя задача зная синтаксическую ошибку, дать студенту короткую подсказку, которая поможет ему понять на что он должен обратить внимание, чтобы ее исправить.
-Твой ответ должен быть в 1 предложение 5-10 слов без примеров кода. Начни предложение с "Вам нужно проверить то-то". Обращайся к студенту на "Вы"
-Скрипт студента: {script}
-{error}
-Твой ответ студенту: 
-"""
+# Задаем llm-модель GigaChat
+from langchain_core.prompts import ChatPromptTemplate
+from langchain.chat_models.gigachat import GigaChat
+from dotenv import load_dotenv
+import os
 
-logic_error_template_value = """
-Ты помощник на специальной обучающей платформе, на которой студент учится программировать, отправляя на проверку свой код. Твоя задача сравнить код преподавателя и студента, чтобы указать студенту логическую ошибку, которая была им допущена и дать короткую подсказку, которая поможет понять ему, на что он должен обратить внимание, чтобы ее исправить.
-Твой ответ должен быть в 1 предложение 5-10 слов без примеров кода. Начни предложение с "Вам нужно проверить". Обращайся к студенту на "Вы" 
-Скрипт преподавателя: {task}
-Скрипт студента: {script}
-{error}
-Твой ответ студенту:
-"""
+# Задаем библиотеки для векторного представления
+import torch
+from transformers import BertModel, BertTokenizer
 
-neutral_error_template_value = """
-Ниже представлен правильный скрипт и скрипт студента, нужно найти ошибку в скрипте студента. Представь, что ты требовательный преподаватель, который хочет, чтобы студент думал своей головой, поэтому давай минимальное описание ошибки. Минимальные рекомендации.
-Правильный скрипт: '''{task}'''
-Неверный скрипт: '''{script}'''
-Сформулируй в одно предложение не раскрывая название переменных, синтаксиса и конструкций, где нужно искать ошибку студенту.
-Начинать предложение можно: "Ошибку можно искать в..."
-Твой ответ:
-"""
+# Загрузка переменных окружения из файла .env
+load_dotenv()
+AUTH = os.getenv('GIGACHAT_AUTH')
+
+# Задаем модель GigaChat
+giga = GigaChat(credentials=AUTH,
+                model='GigaChat:latest',
+                verify_ssl_certs=False)
+
+def llm_model(number, task, script, description, error, error_type):
+    # template = """
+    # В представленном ниже коде студента есть ошибка. Вот правильный скрипт: '''{task}'''
+    # Вот скрипт студента: '''{script}'''
+    # {error}
+    # Сформулируй краткую подсказку, не раскрывая деталей переменных, синтаксиса или конструкции кода.
+    # Ответ должен быть строго одним предложением, направляющим студента на поиск ошибки без указания конкретного решения.
+    # Пример 1: "Проверьте порядок операций в вашем вычислении."
+    # Пример 2: "Убедитесь, что все условия в проверке написаны корректно."
+    # Пример 3: "Проверьте, правильно ли вы используете цикл для обработки данных."
+    # Пример 4: "Обратите внимание на правильность индексирования элементов."
+    # Твой ответ:
+    # """
+
+    if error_type == 'logic error':
+        template = """
+            Описание задачи: '''{description}'''
+            Ниже представлен неверный скрипт студента, нужно найти логическую ошибку.
+            Неверный скрипт: '''{script}'''
+            {error}
+            Определи ошибку в коде и сформулируй сжатый ответ, который поможет студенту самостоятельно её найти. Подсказка должна быть одной строкой и не раскрывать детали исправления
+            Используй следующую конструкцию ответа: "Вы совершили ошибку [...]"
+            Твой короткий ответ:
+            """
+    else:
+        template = """
+            Ниже представлен правильный скрипт и скрипт студента, нужно найти ошибку.
+            Правильный скрипт: '''{task}'''
+            Неверный скрипт: '''{script}'''
+            {error}
+            Определи ошибку в коде и сформулируй сжатый ответ, который поможет студенту самостоятельно её найти. Подсказка должна быть одной строкой и не раскрывать детали исправления
+            Используй следующую конструкцию ответа: "Вы совершили ошибку [...]"
+            Твой короткий ответ:
+            """
+
+    giga = GigaChat(credentials=AUTH,
+                    max_tokens=60,
+                    temperature=0.001,
+                    top_p = 0.9,
+                    model='GigaChat:latest',
+                    verify_ssl_certs=False)
+
+    prompt = ChatPromptTemplate.from_template(template)
+    chain = prompt | giga
+    response = chain.invoke({"task": task, "script": script, "description": description, "error": error}).content
+    if error_type == 'logic error':
+        response = "Ошибка в открытых и скрытых тестах. " + response
+    print('\n')
+    print(f'*** {error}')
+    print('---')
+    print(f"Решение {number}", response)
+    return response
+
+
+def get_sentence_embedding(sentence: str) -> torch.Tensor:
+    inputs = tokenizer(sentence, return_tensors="pt", truncation=True, padding=True, max_length=128)
+    with torch.no_grad():
+        outputs = model(**inputs)
+        embedding = outputs.last_hidden_state[:, 0, :].squeeze()
+    return embedding
+
 
 if __name__ == '__main__':
-    dt1 = datetime.datetime.today()
-    # Загружаем данные
-    df = data_preparation(sample_type="test")
 
-    # Зададим поле с типом ошибки
-    df['error_type'] = df.apply(lambda x: "считывание файла" if x["task_type"] == 2 else
-                                          "sytax error" if x["syntax_error"] is not np.nan and x["syntax_error"] is not None and x["syntax_error"] != '' else
-                                          "logic error" if x["logic_error"] is not np.nan and x["logic_error"] is not None and x["logic_error"] != "" else "ХЗ", axis=1
-                                                                                  )
+    model_name = "DeepPavlov/rubert-base-cased-sentence"
+    tokenizer = BertTokenizer.from_pretrained(model_name)
+    model = BertModel.from_pretrained(model_name)
 
-    # Далее создадим соответствующие templates для LLM-моделей
-    df["syntax_error_template"] = df.apply(
-        lambda x: syntax_error_template_value.format(script=x["student_solution"], error=x["syntax_error"]) if x["error_type"] == "sytax error" else "",
-        axis=1)
-    df["logic_error_template"] = df.apply(
-        lambda x: logic_error_template_value.format(task=x["author_solution"], script=x["student_solution"],
-                                                    error=x["logic_error"]) if x["error_type"] == "logic error" else "",
-        axis=1)
-
-    df["template"] = df["syntax_error_template"] + df["logic_error_template"]
-    # На случай, если не выяснилось, какая именно ошибка
-    df["template"] = df.apply(
-        lambda x: neutral_error_template_value.format(task=x["author_solution"], script=x["student_solution"]) if x["template"] == "" else
-        x["template"], axis=1)
-
-    # Сохраняем результат в файл
-    df.to_excel("data/complete/SuperResultVersionTest.xlsx", index=False)
-    dt2 = datetime.datetime.today()
-    print("Время исполнения программы:", (dt2 - dt1).total_seconds())
+    df_total = errors_def()[['id', 'student_solution', 'author_solution', 'description', 'error', 'error_type']]
+    df_total['author_comment'] = df_total.apply(lambda x: llm_model(x["id"], x['author_solution'], x['student_solution'], x['description'], x['error'],x['error_type']), axis=1)
+    df_total["author_comment_embedding"] = df_total['author_comment'].apply(lambda x: " ".join(list(map(str, get_sentence_embedding(x).tolist()))))
+    df_total = df_total[["id", "author_comment", "author_comment_embedding"]]
+    df_total.rename(columns={"id": "solution_id"}, inplace=True)
+    df_total.to_csv("data/complete/submit_solution_test.csv", index=False)

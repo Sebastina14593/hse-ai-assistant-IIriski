@@ -15,6 +15,7 @@ from collections import deque
 
 import inspect
 
+from injections_check import detect_prompt_injection_combined
 def data_loader(sample_type):
     # Считываем файлы, представленные в качестве обучающих данных
     tests = pd.read_excel(f"data/{sample_type}/tests.xlsx")
@@ -227,6 +228,8 @@ def data_preparation(sample_type="train"):
     # Загружаем данные
     print("Загружаем данные")
     df_tests, df_tasks, df_solutions = data_loader(sample_type)
+    # Добавляем поле с признаком инъекции (0 - нет, 1 - да)
+    df_solutions["is_injection"] = df_solutions["student_solution"].apply(lambda x: detect_prompt_injection_combined(x) * 1)
     # Корректируем их и добавляем дополнительные поля
     print("Корректируем их и добавляем дополнительные поля")
     df_result = data_correction(df_tasks, df_tests, df_solutions)

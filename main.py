@@ -15,24 +15,7 @@ from transformers import BertModel, BertTokenizer
 load_dotenv()
 AUTH = os.getenv('GIGACHAT_AUTH')
 
-# Задаем модель GigaChat
-giga = GigaChat(credentials=AUTH,
-                model='GigaChat:latest',
-                verify_ssl_certs=False)
-
-def llm_model(number, task, script, description, error, error_type):
-    # template = """
-    # В представленном ниже коде студента есть ошибка. Вот правильный скрипт: '''{task}'''
-    # Вот скрипт студента: '''{script}'''
-    # {error}
-    # Сформулируй краткую подсказку, не раскрывая деталей переменных, синтаксиса или конструкции кода.
-    # Ответ должен быть строго одним предложением, направляющим студента на поиск ошибки без указания конкретного решения.
-    # Пример 1: "Проверьте порядок операций в вашем вычислении."
-    # Пример 2: "Убедитесь, что все условия в проверке написаны корректно."
-    # Пример 3: "Проверьте, правильно ли вы используете цикл для обработки данных."
-    # Пример 4: "Обратите внимание на правильность индексирования элементов."
-    # Твой ответ:
-    # """
+def llm_model(number, task, script, description, error, error_type, is_injection):
 
     if error_type == 'logic error':
         template = """
@@ -64,7 +47,14 @@ def llm_model(number, task, script, description, error, error_type):
 
     prompt = ChatPromptTemplate.from_template(template)
     chain = prompt | giga
-    response = chain.invoke({"task": task, "script": script, "description": description, "error": error}).content
+    response = chain.invoke({"task": task, "script": script, "description": description, "error": error})
+
+    # Проверим скрипт студента на промпт-инъекцию
+    if response.response_metadata["finish_reason"] == "blacklist" or is_injection == 1:
+        return "Скрипт студента содержит промпт-инъекцию"
+    else:
+        response = response.content
+
     if error_type == 'logic error':
         response = "Ошибка в открытых и скрытых тестах. " + response
     print('\n')
@@ -88,8 +78,8 @@ if __name__ == '__main__':
     tokenizer = BertTokenizer.from_pretrained(model_name)
     model = BertModel.from_pretrained(model_name)
 
-    df_total = errors_def()[['id', 'student_solution', 'author_solution', 'description', 'error', 'error_type']]
-    df_total['author_comment'] = df_total.apply(lambda x: llm_model(x["id"], x['author_solution'], x['student_solution'], x['description'], x['error'],x['error_type']), axis=1)
+    df_total = errors_def()[['id', 'student_solution', 'author_solution', 'description', 'error', 'error_type', 'is_injection']]
+    df_total['author_comment'] = df_total.apply(lambda x: llm_model(x["id"], x['author_solution'], x['student_solution'], x['description'], x['error'],x['error_type'], x['is_injection']), axis=1)
     df_total["author_comment_embedding"] = df_total['author_comment'].apply(lambda x: " ".join(list(map(str, get_sentence_embedding(x).tolist()))))
     df_total = df_total[["id", "author_comment", "author_comment_embedding"]]
     df_total.rename(columns={"id": "solution_id"}, inplace=True)

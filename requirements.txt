@@ -7,3 +7,4 @@ gigachat
 python-dotenv
 torch
 transformers
+langchain-core

@@ -44,24 +44,24 @@ def errors_def():
                                           "logic error" if x["logic_error"] is not np.nan and x["logic_error"] is not None and x["logic_error"] != "" else "ХЗ", axis=1
                                                                                   )
 
-    # Далее создадим соответствующие templates для LLM-моделей
-    # df["syntax_error_template"] = df.apply(
-    df["template"] = df.apply(
-        lambda x: template1.format(task=x["author_solution"], script=x["student_solution"], error=x["error"]) if x["error_type"] == "sytax error" or x["error_type"]  == 'считывание файла' and x["error"] != 'Тесты пройдены' else "",
-        axis=1)
-    # df["logic_error_template"] = df.apply(
-    df["template"] = df.apply(
-        lambda x: template2.format(task=x["author_solution"], script=x["student_solution"]) if (x["error_type"] == "sytax error" or x["error_type"]  == 'считывание файла') and x["error"] == 'Тесты пройдены' else "",
-        axis=1)
-
-    # df["template"] = df["syntax_error_template"] + df["logic_error_template"]
-    # На случай, если не выяснилось, какая именно ошибка
-    df["template"] = df.apply(
-        lambda x: template3.format(task=x["author_solution"], script=x["student_solution"]) if x["template"] == "" else
-        np.nan, axis=1)
-
-    # Сохраняем результат в файл
-    # df.to_excel("data/complete/SuperResultVersionTest.xlsx", index=False)
+    # # Далее создадим соответствующие templates для LLM-моделей
+    # # df["syntax_error_template"] = df.apply(
+    # df["template"] = df.apply(
+    #     lambda x: template1.format(task=x["author_solution"], script=x["student_solution"], error=x["error"]) if x["error_type"] == "sytax error" or x["error_type"]  == 'считывание файла' and x["error"] != 'Тесты пройдены' else "",
+    #     axis=1)
+    # # df["logic_error_template"] = df.apply(
+    # df["template"] = df.apply(
+    #     lambda x: template2.format(task=x["author_solution"], script=x["student_solution"]) if (x["error_type"] == "sytax error" or x["error_type"]  == 'считывание файла') and x["error"] == 'Тесты пройдены' else "",
+    #     axis=1)
+    #
+    # # df["template"] = df["syntax_error_template"] + df["logic_error_template"]
+    # # На случай, если не выяснилось, какая именно ошибка
+    # df["template"] = df.apply(
+    #     lambda x: template3.format(task=x["author_solution"], script=x["student_solution"]) if x["template"] == "" else
+    #     np.nan, axis=1)
+    #
+    # # Сохраняем результат в файл
+    # # df.to_excel("data/complete/SuperResultVersionTest.xlsx", index=False)
     dt2 = datetime.datetime.today()
     print("Время исполнения программы:", (dt2 - dt1).total_seconds())
     return df
